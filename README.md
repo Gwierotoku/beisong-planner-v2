@@ -4,7 +4,7 @@
 
 纯前端、无第三方依赖、无构建步骤，数据保存在浏览器本地；`file://` 直接双击 `index.html` 也能使用。
 
-**在线使用：<https://gwierotoku.github.io/beisong-planner/>**
+**在线使用：<https://gwierotoku.github.io/beisong-planner-v2/>**
 
 ## 快速开始
 
