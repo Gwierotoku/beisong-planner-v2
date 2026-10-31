@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>打印压力测试数据</title>
+</head>
+<body>
+  <p>正在生成 60 条今日任务…</p>
+  <script src="../js/core.js"></script>
+  <script src="../js/review.js"></script>
+  <script src="../js/budget.js"></script>
+  <script src="../js/model.js"></script>
+  <script>
+    (function () {
+      const state = BS.Model.defaultState();
+      const colors = ['#d9e7f2', '#ddeada'];
+      state.subjects = ['英语', '数学'].map(function (name, index) {
+        return {
+          id: 's' + index,
+          name: name,
+          color: colors[index],
+          archived: false,
+          createdAt: BS.Core.nowIso(),
+        };
+      });
+      BS.Budget.WEEKDAY_KEYS.forEach(function (key) {
+        state.budgets.weekly[key] = {
+          subjects: { s0: 600, s1: 600 },
+          general: 600,
+        };
+      });
+      const today = BS.Core.todayStr();
+      const yesterday = BS.Core.addDays(today, -1);
+      for (let i = 0; i < 60; i++) {
+        const subjectId = i % 2 === 0 ? 's0' : 's1';
+        const id = 'stress-' + i;
+        state.entries.push({
+          id: id,
+          name: '压力测试条目 ' + (i + 1) + '：一个略长的标题用来检查打印换行',
+          subjectId: subjectId,
+          importance: 3,
+          difficulty: 3,
+          firstDate: yesterday,
+          firstMinutes: 10,
+          prepared: false,
+          status: 'active',
+          note: '',
+          createdAt: BS.Core.nowIso(),
+        });
+        state.logs.push({
+          id: 'log-learn-' + i,
+          entryId: id,
+          type: 'learn',
+          round: 1,
+          date: yesterday,
+          at: yesterday + 'T12:00:00.000Z',
+          plannedMinutes: 10,
+          actualMinutes: 10,
+          recall: 'normal',
+          difficulty: 3,
+          needsRelearn: false,
+          completed: true,
+          note: '',
+          dueDate: yesterday,
+          scheduledDate: yesterday,
+          subjectBudgetMinutes: 0,
+          generalBudgetMinutes: 0,
+          legacy: false,
+          firstDateBefore: yesterday,
+        });
+      }
+      try {
+        localStorage.setItem('beisong-plan-v2', JSON.stringify(state));
+      } catch (err) {
+        document.body.setAttribute('data-error', err.message);
+      }
+      location.replace('../index.html#today');
+    })();
+  </script>
+</body>
+</html>

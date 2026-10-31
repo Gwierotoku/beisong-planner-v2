@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>v1 迁移冒烟测试</title>
+</head>
+<body>
+  <p>正在写入旧版本数据并跳转…</p>
+  <script>
+    (function () {
+      function pad(n) {
+        return String(n).padStart(2, '0');
+      }
+      function ymd(offset) {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      }
+      const legacy = {
+        version: 1,
+        subjects: [
+          { id: 's_old_en', name: '英语', color: 1, archived: false },
+          { id: 's_old_math', name: '数学', color: 2, archived: false },
+        ],
+        entries: [
+          {
+            id: 'old_1',
+            name: '旧数据：英语单词',
+            subjectId: 's_old_en',
+            firstDate: ymd(-4),
+            firstMinutes: 20,
+            done: { 1: ymd(-4), 2: ymd(-3) },
+          },
+          {
+            id: 'old_2',
+            name: '旧数据：预备诵',
+            subjectId: 's_old_math',
+            firstDate: ymd(2),
+            firstMinutes: 15,
+            prepared: true,
+            done: {},
+          },
+        ],
+        settings: { cols: 3 },
+      };
+      try {
+        localStorage.removeItem('beisong-plan-v2');
+        localStorage.setItem('beisong-plan-v1', JSON.stringify(legacy));
+        document.body.setAttribute('data-seeded', 'ok');
+      } catch (err) {
+        document.body.setAttribute('data-seeded', 'failed: ' + err.message);
+      }
+      location.replace('../index.html');
+    })();
+  </script>
+</body>
+</html>

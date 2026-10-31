@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>浏览器冒烟测试</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script>
+    window.__errors = [];
+    window.addEventListener('error', function (event) {
+      window.__errors.push(String(event.message) + ' @ ' + String(event.filename) + ':' + String(event.lineno));
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      window.__errors.push('Promise: ' + String(event.reason));
+    });
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <nav class="tabs">
+        <button class="tab" type="button" data-view="today">今日复习</button>
+        <button class="tab" type="button" data-view="budget">预算与标签</button>
+        <button class="tab" type="button" data-view="forecast">负担预测</button>
+        <button class="tab" type="button" data-view="entries">条目管理</button>
+        <button class="tab" type="button" data-view="subjects">科目设置</button>
+        <button class="tab" type="button" data-view="data">数据备份</button>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="view" id="view-today"></section>
+      <section class="view" id="view-budget" hidden></section>
+      <section class="view" id="view-forecast" hidden></section>
+      <section class="view" id="view-entries" hidden></section>
+      <section class="view" id="view-subjects" hidden></section>
+      <section class="view" id="view-data" hidden></section>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="../js/core.js"></script>
+  <script src="../js/review.js"></script>
+  <script src="../js/duration.js"></script>
+  <script src="../js/priority.js"></script>
+  <script src="../js/budget.js"></script>
+  <script src="../js/scheduler.js"></script>
+  <script src="../js/forecast.js"></script>
+  <script src="../js/model.js"></script>
+  <script>
+    // 尝试写入示例数据，验证 localStorage 在 file:// 下是否可用
+    window.__seed = 'skipped';
+    try {
+      localStorage.removeItem('beisong-plan-v2');
+      localStorage.setItem('beisong-plan-v2', JSON.stringify(BS.Model.demoState()));
+      window.__seed = 'ok';
+    } catch (err) {
+      window.__seed = 'failed: ' + err.message;
+    }
+  </script>
+  <script src="../app.js"></script>
+  <script>
+    (function () {
+      const result = { errors: window.__errors, seed: window.__seed, views: {} };
+      function recordView(name) {
+        const section = document.querySelector('#view-' + name);
+        result.views[name] = section ? {
+          length: section.innerHTML.length,
+          text: section.textContent.replace(/\s+/g, ' ').trim().slice(0, 120),
+        } : null;
+      }
+      setTimeout(function () {
+        recordView('today');
+        result.todayHasBudget = (document.querySelector('#view-today').textContent || '').indexOf('今日时间预算') >= 0;
+        result.todayHasTask = document.querySelectorAll('#view-today .today-row').length;
+        result.todayHasPaper = !!document.querySelector('#view-today .paper');
+
+        // 交互：完成第一条任务
+        const firstCheck = document.querySelector('#view-today .today-check');
+        if (firstCheck) {
+          firstCheck.click();
+          result.completeModal = !!document.querySelector('#complete-form');
+          const completeForm = document.querySelector('#complete-form');
+          if (completeForm) {
+            completeForm.elements.actualMinutes.value = '5';
+            completeForm.elements.recall.value = 'easy';
+            completeForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }
+          const donePanel = document.querySelector('.done-panel');
+          result.afterCompleteDone = donePanel
+            ? donePanel.textContent.replace(/\s+/g, ' ').trim().slice(0, 100)
+            : '';
+          result.afterCompleteRows = document.querySelectorAll('#view-today .today-row').length;
+
+          // 撤销刚才的完成记录，任务应回到今日清单
+          window.confirm = function () {
+            return true;
+          };
+          const undoButton = document.querySelector('.done-panel [data-action="undo-log"]');
+          if (undoButton) {
+            undoButton.click();
+            result.undoRows = document.querySelectorAll('#view-today .today-row').length;
+            result.undoToast = (document.querySelector('#toast') || { textContent: '' }).textContent;
+          }
+        }
+
+        // 交互：查看调度原因
+        const whyButton = document.querySelector('#view-today .why-btn');
+        if (whyButton) {
+          whyButton.click();
+          result.whyModal = (document.querySelector('.modal-title') || { textContent: '' }).textContent.trim();
+          const close = document.querySelector('.modal [data-close]');
+          if (close) close.click();
+        }
+
+        ['budget', 'forecast', 'entries', 'subjects', 'data'].forEach(function (name) {
+          const tab = document.querySelector('.tab[data-view="' + name + '"]');
+          if (tab) tab.click();
+          recordView(name);
+        });
+
+        // 交互：标签表单
+        document.querySelector('.tab[data-view="budget"]').click();
+        result.hasEarlySetting = !!document.querySelector('#setting-early-review');
+        result.hasDateAllowForced = !!document.querySelector('[data-date-allow-forced]');
+        const newLabel = document.querySelector('[data-action="new-label"]');
+        if (newLabel) {
+          newLabel.click();
+          result.labelForm = !!document.querySelector('#label-form');
+          const labelForm = document.querySelector('#label-form');
+          if (labelForm) {
+            result.labelHasAllowForced = !!labelForm.elements.allowForced;
+            labelForm.elements.name.value = '冒烟标签';
+            labelForm.elements.general.value = '5';
+            labelForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            result.labelSaved = BS.Model.load().budgets.labels.some(function (label) {
+              return label.name === '冒烟标签';
+            });
+          }
+        }
+
+        // 交互：条目详情
+        document.querySelector('.tab[data-view="entries"]').click();
+        const detail = document.querySelector('[data-action="entry-detail"]');
+        if (detail) {
+          detail.click();
+          result.entryDetail = (document.querySelector('.modal-title') || { textContent: '' }).textContent.trim();
+          const closeDetail = document.querySelector('.modal [data-close]');
+          if (closeDetail) closeDetail.click();
+        }
+
+        // 交互：添加一个待安排的新内容
+        const newEntry = document.querySelector('[data-action="new-entry"]');
+        if (newEntry) {
+          newEntry.click();
+          const entryForm = document.querySelector('#entry-form');
+          if (entryForm) {
+            entryForm.elements.name.value = '冒烟测试条目';
+            entryForm.elements.firstMinutes.value = '10';
+            entryForm.elements.queued.checked = true;
+            entryForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            result.entrySaved = BS.Model.load().entries.some(function (entry) {
+              return entry.name === '冒烟测试条目' && entry.firstDate === null;
+            });
+          }
+        }
+
+        // 交互：预测卡片
+        document.querySelector('.tab[data-view="forecast"]').click();
+        result.forecastCards = document.querySelectorAll('.day-card').length;
+        result.forecastHasOverload = !!document.querySelector('.day-card.is-overload');
+        result.forecastHasSimulated = (document.querySelector('#view-forecast').textContent || '').indexOf('模拟后续复习') >= 0;
+
+        // 切回今日并检查已保存的数据能重新读取
+        document.querySelector('.tab[data-view="today"]').click();
+        result.reloadedStateOk = BS.Model.load().logs.length > 0;
+
+        const paper = document.querySelector('.paper');
+        const main = document.querySelector('main');
+        result.layout = {
+          windowWidth: window.innerWidth,
+          docScrollWidth: document.documentElement.scrollWidth,
+          bodyScrollWidth: document.body.scrollWidth,
+          mainWidth: main ? main.clientWidth : null,
+          paperWidth: paper ? paper.offsetWidth : null,
+          paperScrollWidth: paper ? paper.scrollWidth : null,
+          toolbarScrollWidth: document.querySelector('.toolbar')
+            ? document.querySelector('.toolbar').scrollWidth
+            : null,
+        };
+
+        result.errors = window.__errors.slice();
+        const pre = document.createElement('pre');
+        pre.id = 'result';
+        pre.textContent = JSON.stringify(result, null, 2);
+        document.body.appendChild(pre);
+        document.title = 'SMOKE ' + (result.errors.length ? 'ERRORS' : 'OK');
+      }, 500);
+    })();
+  </script>
+</body>
+</html>

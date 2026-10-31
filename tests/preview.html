@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>预览数据准备</title>
+</head>
+<body>
+  <p>正在载入示例数据…</p>
+  <script src="../js/core.js"></script>
+  <script src="../js/review.js"></script>
+  <script src="../js/budget.js"></script>
+  <script src="../js/model.js"></script>
+  <script>
+    (function () {
+      try {
+        localStorage.setItem('beisong-plan-v2', JSON.stringify(BS.Model.demoState()));
+      } catch (err) {
+        document.body.setAttribute('data-error', err.message);
+      }
+      const view = new URLSearchParams(location.search).get('view') || 'today';
+      location.replace('../index.html#' + view);
+    })();
+  </script>
+</body>
+</html>
